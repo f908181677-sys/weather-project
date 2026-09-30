@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT) || 5500;
 
 // Render 环境使用 HTTP
 // 本地电脑继续使用 HTTPS + mkcert
-const IS_RENDER = process.env.RENDER === "true" || !!process.env.RENDER_EXTERNAL_URL;
+const IS_RENDER = !!process.env.PORT || !!process.env.RENDER || !!process.env.RENDER_EXTERNAL_URL;
 
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
