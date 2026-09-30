@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Vite
+dist/
+.vite/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+# Local HTTPS certificates
+certs/
+
+# Local user data
+data/

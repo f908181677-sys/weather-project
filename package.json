@@ -1,0 +1,9 @@
+{
+  "name": "weather-project",
+  "version": "1.0.0",
+  "description": "Weather application",
+  "main": "js/app.js",
+  "scripts": {
+    "start": "python3 -m http.server 5500"
+  }
+}

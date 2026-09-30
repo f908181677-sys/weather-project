@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>天气网站后台管理</title>
+
+  <!-- Leaflet 地图 -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      margin-bottom: 24px;
+    }
+
+    /* =========================
+       统计卡片
+       ========================= */
+
+    .stats {
+      display: grid;
+      grid-template-columns:
+        repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow:
+        0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    .stat-title {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    /* =========================
+       地图区域
+       ========================= */
+
+    .map-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow:
+        0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    .map-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .map-title {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .map-info {
+      color: #6b7280;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    #userMap {
+      width: 100%;
+      height: 560px;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    /* =========================
+       地址信息
+       ========================= */
+
+    .address-card {
+      margin-top: 16px;
+      padding: 18px;
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+    }
+
+    .address-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .address-main {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    .address-details {
+      display: grid;
+      grid-template-columns:
+        repeat(2, 1fr);
+      gap: 8px 20px;
+      color: #475569;
+      font-size: 14px;
+    }
+
+    .address-loading {
+      color: #64748b;
+    }
+
+    .address-error {
+      color: #dc2626;
+    }
+
+    /* =========================
+       按钮
+       ========================= */
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .danger {
+      background: #dc2626;
+    }
+
+    .secondary {
+      background: #64748b;
+    }
+
+    .success {
+      background: #16a34a;
+    }
+
+    /* =========================
+       用户表格
+       ========================= */
+
+    .panel {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow:
+        0 4px 16px rgba(0,0,0,0.06);
+      overflow-x: auto;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1000px;
+    }
+
+    th,
+    td {
+      padding: 13px 10px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    th {
+      color: #6b7280;
+      font-weight: 600;
+      background: #f8fafc;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    .user-id {
+      font-weight: 600;
+    }
+
+    .accuracy {
+      font-weight: 600;
+    }
+
+    .empty {
+      text-align: center;
+      color: #9ca3af;
+      padding: 40px;
+    }
+
+    /* =========================
+       地图 Marker
+       ========================= */
+
+    .user-marker {
+      width: 18px;
+      height: 18px;
+      background: #2563eb;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow:
+        0 2px 8px rgba(0,0,0,0.35);
+    }
+
+    .selected-marker {
+      width: 24px;
+      height: 24px;
+      background: #dc2626;
+      border: 4px solid white;
+      border-radius: 50%;
+      box-shadow:
+        0 2px 12px rgba(0,0,0,0.4);
+    }
+
+    /* =========================
+       移动端
+       ========================= */
+
+    @media (max-width: 700px) {
+
+      .container {
+        padding: 14px;
+      }
+
+      h1 {
+        font-size: 23px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      #userMap {
+        height: 430px;
+      }
+
+      .map-card,
+      .panel {
+        padding: 14px;
+      }
+
+      .address-details {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>天气网站后台管理</h1>
+
+  <div class="subtitle">
+    用户定位管理 · 地理位置地图
+  </div>
+
+  <!-- =========================
+       统计
+       ========================= -->
+
+  <div class="stats">
+
+    <div class="stat-card">
+      <div class="stat-title">
+        用户总数
+      </div>
+
+      <div
+        class="stat-value"
+        id="userCount"
+      >
+        0
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">
+        今日访问
+      </div>
+
+      <div
+        class="stat-value"
+        id="todayCount"
+      >
+        0
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">
+        最后更新
+      </div>
+
+      <div
+        class="stat-value"
+        id="lastUpdate"
+        style="font-size:18px;"
+      >
+        暂无
+      </div>
+    </div>
+
+  </div>
+
+  <!-- =========================
+       地图
+       ========================= -->
+
+  <div class="map-card">
+
+    <div class="map-header">
+
+      <div>
+
+        <div class="map-title">
+          用户地理位置
+        </div>
+
+        <div
+          class="map-info"
+          id="mapInfo"
+        >
+          点击用户列表中的“查看位置”
+        </div>
+
+      </div>
+
+      <div class="actions">
+
+        <button
+          class="secondary"
+          onclick="showAllUsers()"
+        >
+          显示全部用户
+        </button>
+
+        <button
+          onclick="locateSelectedUser()"
+        >
+          定位选中用户
+        </button>
+
+      </div>
+
+    </div>
+
+    <div id="userMap"></div>
+
+    <!-- =========================
+         详细地址
+         ========================= -->
+
+    <div
+      class="address-card"
+      id="addressCard"
+    >
+
+      <div class="address-title">
+        📍 用户详细位置
+      </div>
+
+      <div
+        class="address-main"
+        id="addressMain"
+      >
+        尚未选择用户
+      </div>
+
+      <div
+        class="address-details"
+        id="addressDetails"
+      >
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- =========================
+       用户列表
+       ========================= -->
+
+  <div class="panel">
+
+    <div class="panel-header">
+
+      <div class="panel-title">
+        用户定位记录
+      </div>
+
+      <div class="actions">
+
+        <button
+          class="success"
+          onclick="loadUsers()"
+        >
+          刷新
+        </button>
+
+        <button
+          class="danger"
+          onclick="deleteAllUsers()"
+        >
+          清空全部记录
+        </button>
+
+      </div>
+
+    </div>
+
+    <table>
+
+      <thead>
+
+        <tr>
+          <th>用户</th>
+          <th>地区</th>
+          <th>纬度</th>
+          <th>经度</th>
+          <th>定位精度</th>
+          <th>最后访问</th>
+          <th>操作</th>
+        </tr>
+
+      </thead>
+
+      <tbody id="userTable">
+
+        <tr>
+          <td
+            colspan="7"
+            class="empty"
+          >
+            正在加载...
+          </td>
+        </tr>
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
+<!-- =========================
+     Leaflet
+     ========================= -->
+
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+></script>
+
+<script>
+
+  // =========================
+  // 全局变量
+  // =========================
+
+  let users = [];
+
+  let map;
+
+  let markers = [];
+
+  let accuracyCircles = [];
+
+  let selectedUserId = null;
+
+
+  // =========================
+  // 初始化地图
+  // =========================
+
+  function initMap() {
+
+    map = L.map("userMap");
+
+    L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+
+        attribution:
+          '&copy; OpenStreetMap contributors'
+      }
+    ).addTo(map);
+
+    map.setView(
+      [35.8617, 104.1954],
+      4
+    );
+  }
+
+
+  // =========================
+  // 清除地图 Marker
+  // =========================
+
+  function clearMapMarkers() {
+
+    markers.forEach(
+      marker =>
+        map.removeLayer(marker)
+    );
+
+    accuracyCircles.forEach(
+      circle =>
+        map.removeLayer(circle)
+    );
+
+    markers = [];
+
+    accuracyCircles = [];
+  }
+
+
+  // =========================
+  // 创建用户 Marker
+  // =========================
+
+  function createUserMarker(
+    user,
+    selected = false
+  ) {
+
+    const icon =
+      L.divIcon({
+
+        className: "",
+
+        html:
+          `<div class="${
+            selected
+              ? "selected-marker"
+              : "user-marker"
+          }"></div>`,
+
+        iconSize:
+          selected
+            ? [24, 24]
+            : [18, 18],
+
+        iconAnchor:
+          selected
+            ? [12, 12]
+            : [9, 9]
+      });
+
+    const marker =
+      L.marker(
+        [
+          user.latitude,
+          user.longitude
+        ],
+        {
+          icon
+        }
+      ).addTo(map);
+
+    const accuracyText =
+      typeof user.accuracy === "number"
+        ? `${Math.round(user.accuracy)} 米`
+        : "未知";
+
+    marker.bindPopup(`
+
+      <div style="
+        min-width:230px;
+        line-height:1.7;
+      ">
+
+        <strong>
+          用户 ${userIndex(user)}
+        </strong>
+
+        <br>
+
+        地区：
+        ${escapeHtml(
+          user.city || "未知"
+        )}
+
+        <br>
+
+        纬度：
+        ${Number(user.latitude)
+          .toFixed(7)}
+
+        <br>
+
+        经度：
+        ${Number(user.longitude)
+          .toFixed(7)}
+
+        <br>
+
+        GPS 精度：
+        ${accuracyText}
+
+        <br>
+
+        最后访问：
+        ${formatTime(user.time)}
+
+      </div>
+
+    `);
+
+    if (
+      typeof user.accuracy === "number" &&
+      user.accuracy > 0
+    ) {
+
+      const circle =
+        L.circle(
+          [
+            user.latitude,
+            user.longitude
+          ],
+          {
+            radius:
+              user.accuracy,
+
+            weight: 1,
+
+            fillOpacity:
+              0.12
+          }
+        ).addTo(map);
+
+      accuracyCircles.push(circle);
+    }
+
+    markers.push(marker);
+
+    return marker;
+  }
+
+
+  // =========================
+  // 显示全部用户
+  // =========================
+
+  function showAllUsers() {
+
+    selectedUserId = null;
+
+    clearMapMarkers();
+
+    clearAddress();
+
+    if (!users.length) {
+
+      map.setView(
+        [35.8617, 104.1954],
+        4
+      );
+
+      document.getElementById(
+        "mapInfo"
+      ).textContent =
+        "当前没有用户定位记录";
+
+      return;
+    }
+
+    const validUsers =
+      users.filter(
+        user =>
+          typeof user.latitude === "number" &&
+          typeof user.longitude === "number"
+      );
+
+    if (!validUsers.length) {
+
+      document.getElementById(
+        "mapInfo"
+      ).textContent =
+        "没有有效的 GPS 坐标";
+
+      return;
+    }
+
+    const bounds = [];
+
+    validUsers.forEach(
+      user => {
+
+        createUserMarker(
+          user,
+          false
+        );
+
+        bounds.push([
+          user.latitude,
+          user.longitude
+        ]);
+      }
+    );
+
+    if (bounds.length === 1) {
+
+      map.setView(
+        bounds[0],
+        18
+      );
+
+    } else {
+
+      map.fitBounds(
+        bounds,
+        {
+          padding:
+            [40, 40],
+
+          maxZoom:
+            17
+        }
+      );
+    }
+
+    document.getElementById(
+      "mapInfo"
+    ).textContent =
+      `当前显示 ${validUsers.length} 个用户`;
+  }
+
+
+  // =========================
+  // 定位用户
+  // =========================
+
+  async function locateUser(
+    userId
+  ) {
+
+    const user =
+      users.find(
+        item =>
+          item.id === userId
+      );
+
+    if (!user) {
+      return;
+    }
+
+    selectedUserId =
+      userId;
+
+    clearMapMarkers();
+
+    const marker =
+      createUserMarker(
+        user,
+        true
+      );
+
+    map.setView(
+      [
+        user.latitude,
+        user.longitude
+      ],
+      18
+    );
+
+    marker.openPopup();
+
+    const accuracyText =
+      typeof user.accuracy === "number"
+        ? `±${Math.round(user.accuracy)} 米`
+        : "未知";
+
+    document.getElementById(
+      "mapInfo"
+    ).textContent =
+      `当前查看：用户 ${userIndex(user)} · GPS 精度 ${accuracyText}`;
+
+    renderUsers();
+
+    // 查询详细地址
+    await reverseGeocode(
+      user
+    );
+  }
+
+
+  // =========================
+  // 定位选中用户
+  // =========================
+
+  function locateSelectedUser() {
+
+    if (!selectedUserId) {
+
+      alert(
+        "请先在用户列表中选择一个用户"
+      );
+
+      return;
+    }
+
+    locateUser(
+      selectedUserId
+    );
+  }
+
+
+  // =========================
+  // 反向地址查询
+  // =========================
+
+  async function reverseGeocode(
+    user
+  ) {
+
+    const main =
+      document.getElementById(
+        "addressMain"
+      );
+
+    const details =
+      document.getElementById(
+        "addressDetails"
+      );
+
+    main.className =
+      "address-main address-loading";
+
+    main.textContent =
+      "正在查询详细地址……";
+
+    details.innerHTML = "";
+
+    try {
+
+      const url =
+        "https://nominatim.openstreetmap.org/reverse" +
+        `?lat=${encodeURIComponent(user.latitude)}` +
+        `&lon=${encodeURIComponent(user.longitude)}` +
+        "&format=jsonv2" +
+        "&zoom=18" +
+        "&addressdetails=1";
+
+      const response =
+        await fetch(
+          url,
+          {
+            headers: {
+              "Accept":
+                "application/json"
+            }
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          "地址查询失败"
+        );
+      }
+
+      const data =
+        await response.json();
+
+      displayAddress(
+        user,
+        data
+      );
+
+    } catch (error) {
+
+      console.error(
+        "反向地址查询失败：",
+        error
+      );
+
+      main.className =
+        "address-main address-error";
+
+      main.textContent =
+        "详细地址暂时无法查询";
+
+      details.innerHTML = `
+
+        <div>
+          你仍然可以使用下面的 GPS 坐标查看位置。
+        </div>
+
+      `;
+    }
+  }
+
+
+  // =========================
+  // 显示地址
+  // =========================
+
+  function displayAddress(
+    user,
+    data
+  ) {
+
+    const address =
+      data.address || {};
+
+    const parts = [];
+
+    const country =
+      address.country;
+
+    const state =
+      address.state ||
+      address.province;
+
+    const city =
+      address.city ||
+      address.town ||
+      address.municipality;
+
+    const district =
+      address.city_district ||
+      address.district ||
+      address.county;
+
+    const town =
+      address.town ||
+      address.village ||
+      address.suburb ||
+      address.neighbourhood;
+
+    const village =
+      address.village ||
+      address.hamlet;
+
+    const road =
+      address.road ||
+      address.pedestrian ||
+      address.footway;
+
+    if (country) {
+      parts.push(country);
+    }
+
+    if (
+      state &&
+      state !== city
+    ) {
+      parts.push(state);
+    }
+
+    if (
+      city &&
+      city !== state
+    ) {
+      parts.push(city);
+    }
+
+    if (
+      district &&
+      district !== city &&
+      district !== state
+    ) {
+      parts.push(district);
+    }
+
+    if (
+      town &&
+      !parts.includes(town)
+    ) {
+      parts.push(town);
+    }
+
+    if (
+      village &&
+      !parts.includes(village)
+    ) {
+      parts.push(village);
+    }
+
+    if (
+      road &&
+      !parts.includes(road)
+    ) {
+      parts.push(road);
+    }
+
+    const main =
+      document.getElementById(
+        "addressMain"
+      );
+
+    const details =
+      document.getElementById(
+        "addressDetails"
+      );
+
+    main.className =
+      "address-main";
+
+    main.textContent =
+      parts.length
+        ? parts.join(" · ")
+        : (
+          data.display_name ||
+          "没有找到详细地址"
+        );
+
+    const accuracy =
+      typeof user.accuracy === "number"
+        ? `±${Math.round(user.accuracy)} 米`
+        : "未知";
+
+    details.innerHTML = `
+
+      <div>
+        <strong>国家：</strong>
+        ${escapeHtml(
+          country || "未知"
+        )}
+      </div>
+
+      <div>
+        <strong>省/州：</strong>
+        ${escapeHtml(
+          state || "未知"
+        )}
+      </div>
+
+      <div>
+        <strong>城市：</strong>
+        ${escapeHtml(
+          city || "未知"
+        )}
+      </div>
+
+      <div>
+        <strong>区/县：</strong>
+        ${escapeHtml(
+          district || "未知"
+        )}
+      </div>
+
+      <div>
+        <strong>镇/街道：</strong>
+        ${escapeHtml(
+          town || "未知"
+        )}
+      </div>
+
+      <div>
+        <strong>村：</strong>
+        ${escapeHtml(
+          village || "未知"
+        )}
+      </div>
+
+      <div>
+        <strong>道路：</strong>
+        ${escapeHtml(
+          road || "未知"
+        )}
+      </div>
+
+      <div>
+        <strong>GPS 精度：</strong>
+        ${accuracy}
+      </div>
+
+      <div>
+        <strong>纬度：</strong>
+        ${Number(
+          user.latitude
+        ).toFixed(7)}
+      </div>
+
+      <div>
+        <strong>经度：</strong>
+        ${Number(
+          user.longitude
+        ).toFixed(7)}
+      </div>
+
+    `;
+  }
+
+
+  // =========================
+  // 清除地址
+  // =========================
+
+  function clearAddress() {
+
+    document.getElementById(
+      "addressMain"
+    ).className =
+      "address-main";
+
+    document.getElementById(
+      "addressMain"
+    ).textContent =
+      "尚未选择用户";
+
+    document.getElementById(
+      "addressDetails"
+    ).innerHTML = "";
+  }
+
+
+  // =========================
+  // 加载用户
+  // =========================
+
+  async function loadUsers() {
+
+    try {
+
+      const response =
+        await fetch(
+          "/api/users"
+        );
+
+      if (!response.ok) {
+
+        throw new Error(
+          "服务器响应错误"
+        );
+      }
+
+      users =
+        await response.json();
+
+      renderUsers();
+
+      updateStats();
+
+      if (selectedUserId) {
+
+        const exists =
+          users.some(
+            user =>
+              user.id ===
+              selectedUserId
+          );
+
+        if (exists) {
+
+          // 自动刷新时只更新地图
+          // 不重复查询地址
+          showSelectedUserWithoutAddress();
+
+        } else {
+
+          selectedUserId =
+            null;
+
+          showAllUsers();
+        }
+
+      } else {
+
+        showAllUsers();
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+      document.getElementById(
+        "userTable"
+      ).innerHTML = `
+
+        <tr>
+
+          <td
+            colspan="7"
+            class="empty"
+          >
+            无法连接后台服务器
+          </td>
+
+        </tr>
+
+      `;
+    }
+  }
+
+
+  // =========================
+  // 自动刷新时显示当前用户
+  // =========================
+
+  function showSelectedUserWithoutAddress() {
+
+    const user =
+      users.find(
+        item =>
+          item.id ===
+          selectedUserId
+      );
+
+    if (!user) {
+      return;
+    }
+
+    clearMapMarkers();
+
+    const marker =
+      createUserMarker(
+        user,
+        true
+      );
+
+    map.setView(
+      [
+        user.latitude,
+        user.longitude
+      ],
+      18
+    );
+
+    marker.openPopup();
+
+    const accuracyText =
+      typeof user.accuracy === "number"
+        ? `±${Math.round(user.accuracy)} 米`
+        : "未知";
+
+    document.getElementById(
+      "mapInfo"
+    ).textContent =
+      `当前查看：用户 ${userIndex(user)} · GPS 精度 ${accuracyText}`;
+  }
+
+
+  // =========================
+  // 用户表格
+  // =========================
+
+  function renderUsers() {
+
+    const table =
+      document.getElementById(
+        "userTable"
+      );
+
+    if (!users.length) {
+
+      table.innerHTML = `
+
+        <tr>
+
+          <td
+            colspan="7"
+            class="empty"
+          >
+            暂无用户定位记录
+          </td>
+
+        </tr>
+
+      `;
+
+      return;
+    }
+
+    table.innerHTML =
+      users.map(
+        user => {
+
+          const accuracy =
+            typeof user.accuracy === "number"
+              ? `±${Math.round(user.accuracy)} 米`
+              : "未知";
+
+          const selected =
+            selectedUserId ===
+            user.id;
+
+          return `
+
+            <tr
+              style="${
+                selected
+                  ? "background:#eff6ff;"
+                  : ""
+              }"
+            >
+
+              <td class="user-id">
+                用户 ${userIndex(user)}
+              </td>
+
+              <td>
+                ${escapeHtml(
+                  user.city ||
+                  "未知位置"
+                )}
+              </td>
+
+              <td>
+                ${Number(
+                  user.latitude
+                ).toFixed(7)}
+              </td>
+
+              <td>
+                ${Number(
+                  user.longitude
+                ).toFixed(7)}
+              </td>
+
+              <td class="accuracy">
+                ${accuracy}
+              </td>
+
+              <td>
+                ${formatTime(
+                  user.time
+                )}
+              </td>
+
+              <td>
+
+                <button
+                  onclick="locateUser('${escapeJs(user.id)}')"
+                >
+                  查看位置
+                </button>
+
+                <button
+                  class="danger"
+                  onclick="deleteUser('${escapeJs(user.id)}')"
+                >
+                  删除
+                </button>
+
+              </td>
+
+            </tr>
+
+          `;
+        }
+      ).join("");
+  }
+
+
+  // =========================
+  // 删除单个用户
+  // =========================
+
+  async function deleteUser(
+    userId
+  ) {
+
+    const user =
+      users.find(
+        item =>
+          item.id === userId
+      );
+
+    if (!user) {
+      return;
+    }
+
+    const confirmed =
+      confirm(
+        `确定删除用户 ${userIndex(user)} 的定位记录吗？`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+
+      const response =
+        await fetch(
+          `/api/users/${encodeURIComponent(userId)}`,
+          {
+            method: "DELETE"
+          }
+        );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+
+        alert(
+          result.message ||
+          "删除失败"
+        );
+
+        return;
+      }
+
+      if (
+        selectedUserId === userId
+      ) {
+
+        selectedUserId =
+          null;
+
+        clearAddress();
+      }
+
+      await loadUsers();
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "无法连接后台服务器"
+      );
+    }
+  }
+
+
+  // =========================
+  // 清空全部用户
+  // =========================
+
+  async function deleteAllUsers() {
+
+    if (!users.length) {
+
+      alert(
+        "当前没有用户记录"
+      );
+
+      return;
+    }
+
+    const confirmed =
+      confirm(
+        "确定要清空全部用户定位记录吗？\n\n这个操作无法恢复。"
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const confirmedAgain =
+      confirm(
+        "再次确认：真的要删除全部用户记录吗？"
+      );
+
+    if (!confirmedAgain) {
+      return;
+    }
+
+    try {
+
+      const response =
+        await fetch(
+          "/api/users",
+          {
+            method: "DELETE"
+          }
+        );
+
+      const result =
+        await response.json();
+
+      if (!response.ok) {
+
+        alert(
+          result.message ||
+          "清空失败"
+        );
+
+        return;
+      }
+
+      users = [];
+
+      selectedUserId = null;
+
+      await loadUsers();
+
+      alert(
+        "全部用户记录已经清除"
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        "无法连接后台服务器"
+      );
+    }
+  }
+
+
+  // =========================
+  // 统计
+  // =========================
+
+  function updateStats() {
+
+    document.getElementById(
+      "userCount"
+    ).textContent =
+      users.length;
+
+    const today =
+      new Date();
+
+    const todayString =
+      today.toDateString();
+
+    const todayCount =
+      users.filter(
+        user =>
+          new Date(user.time)
+            .toDateString() ===
+          todayString
+      ).length;
+
+    document.getElementById(
+      "todayCount"
+    ).textContent =
+      todayCount;
+
+    if (users.length) {
+
+      document.getElementById(
+        "lastUpdate"
+      ).textContent =
+        formatTime(
+          users[0].time
+        );
+
+    } else {
+
+      document.getElementById(
+        "lastUpdate"
+      ).textContent =
+        "暂无";
+    }
+  }
+
+
+  // =========================
+  // 用户编号
+  // =========================
+
+  function userIndex(user) {
+
+    const index =
+      users.findIndex(
+        item =>
+          item.id === user.id
+      );
+
+    return String(
+      index + 1
+    ).padStart(
+      3,
+      "0"
+    );
+  }
+
+
+  // =========================
+  // 时间
+  // =========================
+
+  function formatTime(
+    value
+  ) {
+
+    if (!value) {
+      return "未知";
+    }
+
+    const date =
+      new Date(value);
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return "未知";
+    }
+
+    return date.toLocaleString(
+      "zh-CN",
+      {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }
+    );
+  }
+
+
+  // =========================
+  // HTML 转义
+  // =========================
+
+  function escapeHtml(
+    value
+  ) {
+
+    return String(value)
+      .replaceAll(
+        "&",
+        "&amp;"
+      )
+      .replaceAll(
+        "<",
+        "&lt;"
+      )
+      .replaceAll(
+        ">",
+        "&gt;"
+      )
+      .replaceAll(
+        '"',
+        "&quot;"
+      )
+      .replaceAll(
+        "'",
+        "&#039;"
+      );
+  }
+
+
+  // =========================
+  // JS 转义
+  // =========================
+
+  function escapeJs(
+    value
+  ) {
+
+    return String(value)
+      .replaceAll(
+        "\\",
+        "\\\\"
+      )
+      .replaceAll(
+        "'",
+        "\\'"
+      );
+  }
+
+
+  // =========================
+  // 启动
+  // =========================
+
+  initMap();
+
+  loadUsers();
+
+
+  // =========================
+  // 30 秒自动刷新
+  // =========================
+
+  setInterval(
+    loadUsers,
+    30000
+  );
+
+</script>
+
+</body>
+</html>
