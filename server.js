@@ -12,7 +12,10 @@ const PORT = Number(process.env.PORT) || 5500;
 
 // Render 环境使用 HTTP
 // 本地电脑继续使用 HTTPS + mkcert
-const IS_RENDER = !!process.env.PORT || !!process.env.RENDER || !!process.env.RENDER_EXTERNAL_URL;
+const IS_RENDER =
+  !!process.env.PORT ||
+  !!process.env.RENDER ||
+  !!process.env.RENDER_EXTERNAL_URL;
 
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
@@ -108,7 +111,7 @@ function sendJSON(
         "GET, POST, DELETE, OPTIONS",
 
       "Access-Control-Allow-Headers":
-        "Content-Type, X-User-Id"
+        "Content-Type, X-User-Id, Authorization"
     }
   );
 
@@ -129,10 +132,114 @@ function getUserId(req) {
 }
 
 // =========================
+// 后台管理员认证
+// =========================
+
+function isAdminAuthenticated(req) {
+  const username =
+    process.env.ADMIN_USERNAME;
+
+  const password =
+    process.env.ADMIN_PASSWORD;
+
+  // 如果 Render 没有配置管理员账号密码
+  // 后台默认拒绝访问
+  if (
+    !username ||
+    !password
+  ) {
+    return false;
+  }
+
+  const auth =
+    req.headers.authorization;
+
+  if (
+    !auth ||
+    !auth.startsWith("Basic ")
+  ) {
+    return false;
+  }
+
+  try {
+    const decoded =
+      Buffer.from(
+        auth.substring(6),
+        "base64"
+      ).toString("utf8");
+
+    const separator =
+      decoded.indexOf(":");
+
+    if (
+      separator === -1
+    ) {
+      return false;
+    }
+
+    const inputUsername =
+      decoded.substring(
+        0,
+        separator
+      );
+
+    const inputPassword =
+      decoded.substring(
+        separator + 1
+      );
+
+    return (
+      inputUsername ===
+        username &&
+      inputPassword ===
+        password
+    );
+  } catch {
+    return false;
+  }
+}
+
+// =========================
+// 要求管理员登录
+// =========================
+
+function requireAdmin(
+  req,
+  res
+) {
+  if (
+    isAdminAuthenticated(req)
+  ) {
+    return true;
+  }
+
+  res.writeHead(
+    401,
+    {
+      "Content-Type":
+        "text/plain; charset=utf-8",
+
+      "WWW-Authenticate":
+  'Basic realm="Weather Admin"',
+
+      "Cache-Control":
+        "no-store"
+    }
+  );
+
+  res.end(
+    "需要管理员登录"
+  );
+
+  return false;
+}
+
+// =========================
 // 地址缓存
 // =========================
 
-const addressCache = new Map();
+const addressCache =
+  new Map();
 
 let lastGeocodeTime = 0;
 
@@ -180,8 +287,10 @@ function reverseGeocode(
         Math.max(
           0,
           1100 -
-            (now -
-              lastGeocodeTime)
+            (
+              now -
+              lastGeocodeTime
+            )
         );
 
       if (
@@ -226,7 +335,7 @@ function reverseGeocode(
 
               "Referer":
                 IS_RENDER
-                  ? "https://weather-project.onrender.com/"
+                  ? "https://weather-project-x5k3.onrender.com/"
                   : "https://localhost:5500/"
             }
           },
@@ -394,20 +503,6 @@ function serveFile(
 }
 
 // =========================
-// 创建服务器
-// =========================
-
-const server =
-  IS_RENDER
-    ? http.createServer(
-        requestHandler
-      )
-    : https.createServer(
-        HTTPS_OPTIONS,
-        requestHandler
-      );
-
-// =========================
 // 请求处理
 // =========================
 
@@ -435,13 +530,33 @@ async function requestHandler(
           "GET, POST, DELETE, OPTIONS",
 
         "Access-Control-Allow-Headers":
-          "Content-Type, X-User-Id"
+          "Content-Type, X-User-Id, Authorization"
       }
     );
 
     res.end();
 
     return;
+  }
+
+  // =========================
+  // 后台页面保护
+  // =========================
+
+  if (
+    req.method === "GET" &&
+    req.url.split("?")[0] ===
+      "/admin.html"
+  ) {
+
+    if (
+      !requireAdmin(
+        req,
+        res
+      )
+    ) {
+      return;
+    }
   }
 
   // =========================
@@ -452,6 +567,15 @@ async function requestHandler(
     req.method === "GET" &&
     req.url === "/api/users"
   ) {
+
+    if (
+      !requireAdmin(
+        req,
+        res
+      )
+    ) {
+      return;
+    }
 
     const users =
       readUsers();
@@ -479,6 +603,15 @@ async function requestHandler(
     req.method === "DELETE" &&
     req.url === "/api/users"
   ) {
+
+    if (
+      !requireAdmin(
+        req,
+        res
+      )
+    ) {
+      return;
+    }
 
     saveUsers([]);
 
@@ -508,6 +641,15 @@ async function requestHandler(
       "/api/users/"
     )
   ) {
+
+    if (
+      !requireAdmin(
+        req,
+        res
+      )
+    ) {
+      return;
+    }
 
     const userId =
       decodeURIComponent(
@@ -857,6 +999,20 @@ async function requestHandler(
     filePath
   );
 }
+
+// =========================
+// 创建服务器
+// =========================
+
+const server =
+  IS_RENDER
+    ? http.createServer(
+        requestHandler
+      )
+    : https.createServer(
+        HTTPS_OPTIONS,
+        requestHandler
+      );
 
 // =========================
 // 启动服务器
