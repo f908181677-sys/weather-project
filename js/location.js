@@ -1,7 +1,7 @@
 // =========================================================
-// 我的天气 V27
+// 我的天气 V28
 // js/location.js
-// 高精度定位、地区名称管理、后台定位上报
+// 高精度定位、前台省市区显示、后台定位上报
 // =========================================================
 
 import {
@@ -10,7 +10,18 @@ import {
 
 
 // =========================================================
-// 构建完整地区名称
+// 构建前台显示地区名称
+//
+// 用户端只显示：
+// 广东省 · 广州市 · 白云区
+//
+// 不显示：
+// 国家
+// 街道
+// 道路
+// 门牌号
+// GPS精度
+// 经纬度
 // =========================================================
 
 export function buildLocationName(
@@ -19,23 +30,33 @@ export function buildLocationName(
 
   const parts = [];
 
-  addUnique(
-    parts,
-    address.country
-  );
+  // -------------------------------------------------------
+  // 省 / 州
+  // -------------------------------------------------------
 
   addUnique(
     parts,
     address.state ||
-    address.province
+    address.province ||
+    address.state_district
   );
+
+
+  // -------------------------------------------------------
+  // 城市
+  // -------------------------------------------------------
 
   addUnique(
     parts,
     address.city ||
-    address.town ||
-    address.municipality
+    address.municipality ||
+    address.town
   );
+
+
+  // -------------------------------------------------------
+  // 区 / 县
+  // -------------------------------------------------------
 
   addUnique(
     parts,
@@ -43,6 +64,7 @@ export function buildLocationName(
     address.district ||
     address.county
   );
+
 
   return (
     parts.length > 0
@@ -54,6 +76,9 @@ export function buildLocationName(
 
 // =========================================================
 // 构建搜索结果地区名称
+//
+// 搜索结果仍然按照：
+// 国家 · 一级行政区 · 二级行政区 · 地点
 // =========================================================
 
 export function buildSearchLocationName(
@@ -92,7 +117,8 @@ export function buildSearchLocationName(
 
 // =========================================================
 // 反向地理编码
-// 经纬度 → 国家 / 省 / 市 / 区
+//
+// 经纬度 → 前台显示的省 / 市 / 区
 // =========================================================
 
 export async function getLocationName(
@@ -106,12 +132,15 @@ export async function getLocationName(
   const lon =
     Number(longitude);
 
+
   if (
     !Number.isFinite(lat) ||
     !Number.isFinite(lon)
   ) {
+
     return "当前位置";
   }
+
 
   try {
 
@@ -121,16 +150,24 @@ export async function getLocationName(
         lon
       );
 
+
     if (
       !data ||
       !data.address
     ) {
+
       return "当前位置";
     }
+
+
+    // -----------------------------------------------------
+    // 前台只返回省、市、区
+    // -----------------------------------------------------
 
     return buildLocationName(
       data.address
     );
+
 
   } catch (error) {
 
@@ -146,6 +183,7 @@ export async function getLocationName(
 
 // =========================================================
 // 获取本机用户ID
+//
 // 每个浏览器生成一个固定ID
 // =========================================================
 
@@ -154,15 +192,18 @@ function getLocalUserId() {
   const storageKey =
     "weather_user_id";
 
+
   let userId =
     localStorage.getItem(
       storageKey
     );
 
+
   if (!userId) {
 
     userId =
       crypto.randomUUID();
+
 
     localStorage.setItem(
       storageKey,
@@ -170,12 +211,23 @@ function getLocalUserId() {
     );
   }
 
+
   return userId;
 }
 
 
 // =========================================================
 // 将高精度定位发送到后台
+//
+// 注意：
+// city 这里给前台/接口使用的是：
+// 广东省 · 广州市 · 白云区
+//
+// 但是后台 server.js 会根据：
+// latitude + longitude
+//
+// 继续进行详细反向地理编码。
+// 因此不会影响后台保存街道、道路等详细信息。
 // =========================================================
 
 async function reportLocationToServer(
@@ -186,6 +238,7 @@ async function reportLocationToServer(
     return;
   }
 
+
   try {
 
     const city =
@@ -194,8 +247,10 @@ async function reportLocationToServer(
         location.longitude
       );
 
+
     const userId =
       getLocalUserId();
+
 
     const response =
       await fetch(
@@ -204,16 +259,25 @@ async function reportLocationToServer(
           method: "POST",
 
           headers: {
+
             "Content-Type":
               "application/json",
 
             "X-User-Id":
               userId
+
           },
 
           body: JSON.stringify({
 
+            // 前台地区名称
+            // 只到省、市、区
             city,
+
+            // ------------------------------------------------
+            // 以下信息继续发送给后台
+            // 后台可以根据这些信息保存详细位置
+            // ------------------------------------------------
 
             latitude:
               location.latitude,
@@ -228,6 +292,7 @@ async function reportLocationToServer(
         }
       );
 
+
     if (!response.ok) {
 
       throw new Error(
@@ -235,8 +300,10 @@ async function reportLocationToServer(
       );
     }
 
+
     const result =
       await response.json();
+
 
     if (
       result &&
@@ -249,22 +316,30 @@ async function reportLocationToServer(
       );
     }
 
+
     console.log(
       "高精度定位已发送到后台：",
       {
         city,
+
         latitude:
           location.latitude,
+
         longitude:
           location.longitude,
+
         accuracy:
           location.accuracy
       }
     );
 
+
   } catch (error) {
 
+    // -----------------------------------------------------
     // 后台上报失败不影响天气网站正常使用
+    // -----------------------------------------------------
+
     console.warn(
       "定位后台上报失败：",
       error
@@ -288,6 +363,7 @@ export function requestBrowserLocation() {
   return new Promise(
     (resolve, reject) => {
 
+
       // ---------------------------------------------------
       // 浏览器不支持定位
       // ---------------------------------------------------
@@ -309,11 +385,14 @@ export function requestBrowserLocation() {
       let bestLocation =
         null;
 
+
       let watchId =
         null;
 
+
       let finished =
         false;
+
 
       const startTime =
         Date.now();
@@ -330,6 +409,7 @@ export function requestBrowserLocation() {
         if (finished) {
           return;
         }
+
 
         finished = true;
 
@@ -482,6 +562,7 @@ export function requestBrowserLocation() {
                 longitude
               )
             ) {
+
               return;
             }
 
@@ -584,7 +665,9 @@ export function requestBrowserLocation() {
 
           },
 
+
           handleError,
+
 
           {
 
@@ -626,8 +709,10 @@ export function requestBrowserLocation() {
           } else {
 
             handleError({
+
               code:
                 3
+
             });
 
           }
@@ -664,8 +749,10 @@ function normalizeText(
     value === null ||
     value === undefined
   ) {
+
     return "";
   }
+
 
   return String(value)
     .trim();
@@ -684,13 +771,16 @@ function addUnique(
   const text =
     normalizeText(value);
 
+
   if (!text) {
     return;
   }
 
+
   if (
     !array.includes(text)
   ) {
+
     array.push(text);
   }
 }
